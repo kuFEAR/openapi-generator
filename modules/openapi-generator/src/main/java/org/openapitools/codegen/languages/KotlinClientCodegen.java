@@ -47,10 +47,10 @@ public class KotlinClientCodegen extends AbstractKotlinCodegen {
     protected static final String JVM_RETROFIT2 = "jvm-retrofit2";
     protected static final String MULTIPLATFORM = "multiplatform";
 
-    public static final String USE_RX_JAVA = "useRxJava";
-    public static final String USE_RX_JAVA2 = "useRxJava2";
-    public static final String USE_COROUTINES = "useCoroutines";
-    public static final String DO_NOT_USE_RX_AND_COROUTINES = "doNotUseRxAndCoroutines";
+    public static final String RX_JAVA = "RxJava";
+    public static final String RX_JAVA2 = "RxJava2";
+    public static final String COROUTINES = "Coroutines";
+    public static final String CALLBACK = "Callback";
 
     public static final String DATE_LIBRARY = "dateLibrary";
     public static final String REQUEST_DATE_CONVERTER = "requestDateConverter";
@@ -64,9 +64,7 @@ public class KotlinClientCodegen extends AbstractKotlinCodegen {
     protected boolean useRxJava = false;
     protected boolean useRxJava2 = false;
     protected boolean useCoroutines = false;
-    // backwards compatibility for openapi configs that specify neither rx1 nor rx2
-    // (mustache does not allow for boolean operators so we need this extra field)
-    protected boolean doNotUseRxAndCoroutines = true;
+    protected boolean useCallback = true;
 
     public enum DateLibrary {
         STRING("string"),
@@ -192,9 +190,14 @@ public class KotlinClientCodegen extends AbstractKotlinCodegen {
         requestDateConverter.setDefault(this.requestDateConverter);
         cliOptions.add(requestDateConverter);
 
-        cliOptions.add(CliOption.newBoolean(USE_RX_JAVA, "Whether to use the RxJava adapter with the retrofit2 library."));
-        cliOptions.add(CliOption.newBoolean(USE_RX_JAVA2, "Whether to use the RxJava2 adapter with the retrofit2 library."));
-        cliOptions.add(CliOption.newBoolean(USE_COROUTINES, "Whether to use the Coroutines adapter with the retrofit2 library."));
+        supportedAsyncLibraries.put(CALLBACK, "[DEFAULT] Whether to use the default Call interface of Retrofit with the retrofit2 library.");
+        supportedAsyncLibraries.put(RX_JAVA, "Whether to use the RxJava adapter with the retrofit2 library.");
+        supportedAsyncLibraries.put(RX_JAVA2, "Whether to use the RxJava2 adapter with the retrofit2 library.");
+        supportedAsyncLibraries.put(COROUTINES, "Whether to use the Coroutines adapter with the retrofit2 library.");
+
+        CliOption asyncLibraryOption = new CliOption(CodegenConstants.ASYNC_LIBRARY, "Allow Kotlin generators to offer an option of async library");
+        asyncLibraryOption.setEnum(supportedAsyncLibraries);
+        asyncLibraryOption.setDefault(CALLBACK);
     }
 
     public CodegenType getTag() {
@@ -212,7 +215,7 @@ public class KotlinClientCodegen extends AbstractKotlinCodegen {
     public void setUseRxJava(boolean useRxJava) {
         if (useRxJava) {
             this.useRxJava2 = false;
-            this.doNotUseRxAndCoroutines = false;
+            this.useCallback = false;
             this.useCoroutines = false;
         }
         this.useRxJava = useRxJava;
@@ -221,26 +224,26 @@ public class KotlinClientCodegen extends AbstractKotlinCodegen {
     public void setUseRxJava2(boolean useRxJava2) {
         if (useRxJava2) {
             this.useRxJava = false;
-            this.doNotUseRxAndCoroutines = false;
+            this.useCallback = false;
             this.useCoroutines = false;
         }
         this.useRxJava2 = useRxJava2;
     }
 
-    public void setDoNotUseRxAndCoroutines(boolean doNotUseRxAndCoroutines) {
-        if (doNotUseRxAndCoroutines) {
+    public void setUseCallback(boolean useCallback) {
+        if (useCallback) {
             this.useRxJava = false;
             this.useRxJava2 = false;
             this.useCoroutines = false;
         }
-        this.doNotUseRxAndCoroutines = doNotUseRxAndCoroutines;
+        this.useCallback = useCallback;
     }
 
     public void setUseCoroutines(boolean useCoroutines) {
         if (useCoroutines) {
             this.useRxJava = false;
             this.useRxJava2 = false;
-            this.doNotUseRxAndCoroutines = false;
+            this.useCallback = false;
         }
         this.useCoroutines = useCoroutines;
     }
@@ -266,38 +269,6 @@ public class KotlinClientCodegen extends AbstractKotlinCodegen {
             sourceFolder = "src/commonMain/kotlin";
         }
 
-
-        boolean hasRx = additionalProperties.containsKey(USE_RX_JAVA);
-        boolean hasRx2 = additionalProperties.containsKey(USE_RX_JAVA2);
-        boolean hasCoroutines = additionalProperties.containsKey(USE_COROUTINES);
-        int optionCount = 0;
-        if (hasRx) {
-            optionCount++;
-        }
-        if (hasRx2) {
-            optionCount++;
-        }
-        if (hasCoroutines) {
-            optionCount++;
-        }
-        boolean hasConflict = optionCount > 1;
-
-        // RxJava & Coroutines
-        if (hasConflict) {
-            LOGGER.warn("You specified both RxJava versions 1 and 2 or Coroutines together, please choose one them.");
-        } else if (hasRx) {
-            this.setUseRxJava(Boolean.valueOf(additionalProperties.get(USE_RX_JAVA).toString()));
-        } else if (hasRx2) {
-            this.setUseRxJava2(Boolean.valueOf(additionalProperties.get(USE_RX_JAVA2).toString()));
-        } else if (hasCoroutines) {
-            this.setUseCoroutines(Boolean.valueOf(additionalProperties.get(USE_COROUTINES).toString()));
-        }
-
-        if (!hasRx && !hasRx2 && !hasCoroutines) {
-            setDoNotUseRxAndCoroutines(true);
-            additionalProperties.put(DO_NOT_USE_RX_AND_COROUTINES, true);
-        }
-
         // infrastructure destination folder
         final String infrastructureFolder = (sourceFolder + File.separator + packageName + File.separator + "infrastructure").replace(".", "/");
 
@@ -318,6 +289,26 @@ public class KotlinClientCodegen extends AbstractKotlinCodegen {
                 processJVMOkHttpLibrary(infrastructureFolder);
                 break;
             case JVM_RETROFIT2:
+                switch (getAsyncLibrary()) {
+                    case RX_JAVA:
+                        this.setUseRxJava(true);
+                        additionalProperties.put(RX_JAVA, true);
+                        break;
+                    case RX_JAVA2:
+                        this.setUseRxJava2(true);
+                        additionalProperties.put(RX_JAVA2, true);
+                        break;
+                    case COROUTINES:
+                        this.setUseCoroutines(true);
+                        additionalProperties.put(COROUTINES, true);
+                        break;
+                    case CALLBACK:
+                    default:
+                        setUseCallback(true);
+                        additionalProperties.put(CALLBACK, true);
+                        break;
+                }
+
                 processJVMRetrofit2Library(infrastructureFolder);
                 break;
             case MULTIPLATFORM:

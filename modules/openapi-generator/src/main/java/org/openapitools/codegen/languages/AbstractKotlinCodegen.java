@@ -50,6 +50,8 @@ public abstract class AbstractKotlinCodegen extends DefaultCodegen implements Co
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractKotlinCodegen.class);
 
+    protected Map<String, String> supportedAsyncLibraries = new LinkedHashMap<String, String>();
+    protected String asyncLibrary;
     protected String artifactId;
     protected String artifactVersion = "1.0.0";
     protected String groupId = "org.openapitools";
@@ -498,6 +500,45 @@ public abstract class AbstractKotlinCodegen extends DefaultCodegen implements Co
 
     public void setNeedsDataClassBody(boolean needsDataClassBody) {
         this.needsDataClassBody = needsDataClassBody;
+    }
+
+    /**
+     * All library templates supported.
+     * (key: library name, value: library description)
+     *
+     * @return the supported libraries
+     */
+    public Map<String, String> supportedAsyncLibraries() {
+        return supportedAsyncLibraries;
+    }
+
+    /**
+     * Set async library options.
+     *
+     * @param asyncLibrary Library template
+     */
+    public void setAsyncLibrary(String asyncLibrary) {
+        if (asyncLibrary != null && !supportedAsyncLibraries.containsKey(asyncLibrary)) {
+            StringBuilder sb = new StringBuilder("Unknown async library: " + asyncLibrary + "\nAvailable libraries:");
+            if (supportedAsyncLibraries.size() == 0) {
+                sb.append("\n  ").append("NONE");
+            } else {
+                for (String lib : supportedAsyncLibraries.keySet()) {
+                    sb.append("\n  ").append(lib);
+                }
+            }
+            throw new RuntimeException(sb.toString());
+        }
+        this.asyncLibrary = asyncLibrary;
+    }
+
+    /**
+     * Async library option.
+     *
+     * @return Async Library option
+     */
+    public String getAsyncLibrary() {
+        return asyncLibrary;
     }
 
     /**

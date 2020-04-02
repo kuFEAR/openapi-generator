@@ -135,6 +135,9 @@ public class CodegenConstants {
     public static final String LIBRARY = "library";
     public static final String LIBRARY_DESC = "library template (sub-template)";
 
+    public static final String ASYNC_LIBRARY = "async_library";
+    public static final String ASYNC_LIBRARY_DESC = "Allow different language generators to offer an option of async library";
+
     public static final String SORT_PARAMS_BY_REQUIRED_FLAG = "sortParamsByRequiredFlag";
     public static final String SORT_PARAMS_BY_REQUIRED_FLAG_DESC = "Sort method arguments to place required parameters before optional parameters.";
 
