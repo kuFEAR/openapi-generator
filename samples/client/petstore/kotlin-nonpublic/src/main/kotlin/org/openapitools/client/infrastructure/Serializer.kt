@@ -14,6 +14,8 @@ internal object Serializer {
         .add(LocalDateAdapter())
         .add(UUIDAdapter())
         .add(ByteArrayAdapter())
+        .add(BigDecimalAdapter())
+        .add(BigIntegerAdapter())
         .add(KotlinJsonAdapterFactory())
 
     @JvmStatic
